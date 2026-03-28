@@ -5,9 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Code, Cpu, Server, Lock, Mail, ExternalLink, Activity, MessageCircle, Send, ChevronRight, Settings, X, Plus, Trash2, Terminal, FileCode, BookOpen, Github, UploadCloud, Globe, Wifi, Monitor, CheckCircle2, Loader2, Search, Check, LogOut, Linkedin, Twitter, Quote } from 'lucide-react';
+import { Shield, Code, Cpu, Server, Lock, Mail, ExternalLink, Activity, MessageCircle, Send, ChevronRight, Settings, X, Plus, Trash2, Terminal, FileCode, BookOpen, Github, UploadCloud, Globe, Wifi, Monitor, CheckCircle2, Loader2, Search, Check, LogOut, Linkedin, Twitter, Quote, Battery, HardDrive, Clock, MapPin, Compass, Crosshair, Power, Signal, ShieldCheck, Camera, MessageSquare, Smartphone } from 'lucide-react';
 import { auth, db } from './firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, GithubAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, GithubAuthProvider, signInWithPopup, onAuthStateChanged, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { collection, addDoc, getDocs, query, where, onSnapshot, serverTimestamp, orderBy } from 'firebase/firestore';
 
 type SocialLink = { id: string; label: string; url: string };
@@ -24,6 +24,56 @@ export default function App() {
   const [activeSkillModal, setActiveSkillModal] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [networkInfo, setNetworkInfo] = useState({ ip: 'Scanning...', device: 'Detecting...', status: 'Online', type: 'Unknown', location: 'Detecting...' });
+  const [advancedDeviceInfo, setAdvancedDeviceInfo] = useState({
+    battery: 'Checking...',
+    screen: '',
+    cores: '',
+    memory: '',
+    timezone: '',
+    gpu: '',
+    preciseLocation: 'Click to fetch',
+    browser: ''
+  });
+
+  const vpnServers = [
+    { id: 'us', name: 'United States', flag: '🇺🇸', ip: '198.51.100.24', ping: '42ms', signal: 95 },
+    { id: 'uk', name: 'United Kingdom', flag: '🇬🇧', ip: '203.0.113.89', ping: '18ms', signal: 98 },
+    { id: 'ca', name: 'Canada', flag: '🇨🇦', ip: '192.0.2.146', ping: '35ms', signal: 92 },
+    { id: 'au', name: 'Australia', flag: '🇦🇺', ip: '203.0.113.211', ping: '180ms', signal: 70 },
+    { id: 'fr', name: 'France', flag: '🇫🇷', ip: '198.51.100.101', ping: '22ms', signal: 94 },
+    { id: 'de', name: 'Germany', flag: '🇩🇪', ip: '85.214.132.11', ping: '25ms', signal: 90 },
+    { id: 'jp', name: 'Japan', flag: '🇯🇵', ip: '103.2.14.88', ping: '145ms', signal: 75 },
+    { id: 'sg', name: 'Singapore', flag: '🇸🇬', ip: '118.200.23.1', ping: '120ms', signal: 82 },
+    { id: 'br', name: 'Brazil', flag: '🇧🇷', ip: '177.43.21.99', ping: '110ms', signal: 80 },
+    { id: 'in', name: 'India', flag: '🇮🇳', ip: '115.112.44.12', ping: '130ms', signal: 78 },
+    { id: 'za', name: 'South Africa', flag: '🇿🇦', ip: '196.21.44.55', ping: '160ms', signal: 65 },
+    { id: 'ch', name: 'Switzerland', flag: '🇨🇭', ip: '185.159.157.12', ping: '12ms', signal: 100 },
+    { id: 'nl', name: 'Netherlands', flag: '🇳🇱', ip: '89.20.14.33', ping: '15ms', signal: 99 },
+    { id: 'se', name: 'Sweden', flag: '🇸🇪', ip: '193.10.22.44', ping: '20ms', signal: 96 },
+    { id: 'kr', name: 'South Korea', flag: '🇰🇷', ip: '211.45.66.77', ping: '135ms', signal: 85 },
+    { id: 'ae', name: 'UAE', flag: '🇦🇪', ip: '94.200.11.22', ping: '150ms', signal: 72 },
+    { id: 'mx', name: 'Mexico', flag: '🇲🇽', ip: '189.200.11.22', ping: '60ms', signal: 88 },
+    { id: 'it', name: 'Italy', flag: '🇮🇹', ip: '151.100.11.22', ping: '30ms', signal: 91 },
+    { id: 'es', name: 'Spain', flag: '🇪🇸', ip: '212.100.11.22', ping: '28ms', signal: 93 },
+    { id: 'ru', name: 'Russia', flag: '🇷🇺', ip: '46.100.11.22', ping: '80ms', signal: 75 },
+    { id: 'cn', name: 'China', flag: '🇨🇳', ip: '114.100.11.22', ping: '160ms', signal: 60 },
+  ];
+  const [vpnStatus, setVpnStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [selectedVpnServer, setSelectedVpnServer] = useState(vpnServers[0]);
+
+  const toggleVpn = () => {
+    if (vpnStatus === 'connected') {
+      setVpnStatus('disconnected');
+    } else {
+      setVpnStatus('connecting');
+      setTimeout(() => {
+        setVpnStatus('connected');
+      }, 2000);
+    }
+  };
+
+  const displayIp = vpnStatus === 'connected' ? selectedVpnServer.ip : networkInfo.ip;
+  const displayLocation = vpnStatus === 'connected' ? selectedVpnServer.name : networkInfo.location;
   
   // Admin Panel States
   const [adminAuth, setAdminAuth] = useState(false);
@@ -36,6 +86,18 @@ export default function App() {
   const [hostingEmail, setHostingEmail] = useState('');
   const [hostingPassword, setHostingPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  
+  // Forgot Password States
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+
+  // Phone Connection States
+  const [phoneConnected, setPhoneConnected] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [smsStatus, setSmsStatus] = useState('Checking...');
+
   const [githubConnected, setGithubConnected] = useState(false);
   const [githubRepos, setGithubRepos] = useState<any[]>([]);
   const [deployments, setDeployments] = useState<any[]>([]);
@@ -118,6 +180,44 @@ export default function App() {
     }
   ];
 
+  const hackingTools = [
+    {
+      id: 'port-scanner',
+      title: 'Port Scanner',
+      icon: <Activity className="w-6 h-6 text-red-400" />,
+      description: 'Identify open ports and running services on target systems.',
+      items: ['TCP Connect Scan', 'SYN Stealth Scan', 'UDP Scan', 'Service Version Detection', 'OS Fingerprinting']
+    },
+    {
+      id: 'password-cracker',
+      title: 'Password Cracker (Conceptual)',
+      icon: <Lock className="w-6 h-6 text-red-500" />,
+      description: 'Demonstration of password recovery and hash cracking techniques.',
+      items: ['Dictionary Attack', 'Brute Force Simulation', 'Rainbow Table Lookup', 'Hash Identification', 'Salting Concepts']
+    },
+    {
+      id: 'network-analyzer',
+      title: 'Network Analyzer',
+      icon: <Wifi className="w-6 h-6 text-orange-400" />,
+      description: 'Packet sniffing and traffic analysis for network troubleshooting.',
+      items: ['Packet Capture (PCAP)', 'Protocol Dissection', 'Traffic Filtering', 'DNS Spoofer Demo', 'ARP Poisoning Concept']
+    },
+    {
+      id: 'vuln-scanner',
+      title: 'Vulnerability Scanner',
+      icon: <ShieldCheck className="w-6 h-6 text-yellow-400" />,
+      description: 'Automated assessment of systems to identify known vulnerabilities.',
+      items: ['CVE Database Lookup', 'Web App Scanning', 'Misconfiguration Checks', 'Outdated Software Detection', 'Compliance Audits']
+    },
+    {
+      id: 'exploit-framework',
+      title: 'Exploit Framework (Demo)',
+      icon: <Terminal className="w-6 h-6 text-rose-500" />,
+      description: 'A conceptual framework demonstrating exploit delivery and payload execution.',
+      items: ['Payload Generation', 'Listener Configuration', 'Session Management', 'Post-Exploitation Modules', 'Pivoting Concepts']
+    }
+  ];
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const page = params.get('page');
@@ -164,6 +264,72 @@ export default function App() {
 
     setNetworkInfo(prev => ({ ...prev, device, type }));
 
+    // Advanced Device Info
+    const getAdvancedInfo = async () => {
+      let batteryStr = 'Not available';
+      if ('getBattery' in navigator) {
+        try {
+          const battery: any = await (navigator as any).getBattery();
+          batteryStr = `${Math.round(battery.level * 100)}% ${battery.charging ? '(Charging)' : ''}`;
+        } catch (e) {}
+      }
+
+      let gpu = 'Unknown';
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (gl) {
+          const debugInfo = (gl as any).getExtension('WEBGL_debug_renderer_info');
+          if (debugInfo) {
+            gpu = (gl as any).getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+          }
+        }
+      } catch (e) {}
+
+      setAdvancedDeviceInfo({
+        battery: batteryStr,
+        screen: `${window.screen.width}x${window.screen.height} (${window.screen.colorDepth}-bit)`,
+        cores: navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} Cores` : 'Unknown',
+        memory: (navigator as any).deviceMemory ? `${(navigator as any).deviceMemory} GB+` : 'Unknown',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        gpu: gpu || 'Unknown',
+        preciseLocation: 'Initializing Live GPS...',
+        browser: navigator.userAgent.split(' ').pop() || 'Unknown'
+      });
+    };
+    getAdvancedInfo();
+
+    // Live GPS Tracking
+    let watchId: number;
+    if ('geolocation' in navigator) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          setAdvancedDeviceInfo(prev => ({ 
+            ...prev, 
+            preciseLocation: `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)} (Acc: ${Math.round(position.coords.accuracy)}m) [LIVE]` 
+          }));
+        },
+        (error) => {
+          setAdvancedDeviceInfo(prev => ({ ...prev, preciseLocation: `Denied/Error: ${error.message}` }));
+        },
+        { enableHighAccuracy: true, maximumAge: 0 }
+      );
+    }
+
+    // Request Camera Access on Load
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        setCameraActive(true);
+        setPhoneConnected(true);
+        setSmsStatus('OS Blocked (Sandbox)');
+        // Stop tracks immediately as we just want to simulate connection/permission
+        stream.getTracks().forEach(track => track.stop());
+      })
+      .catch(err => {
+        setCameraActive(false);
+        setSmsStatus('Permission Denied');
+      });
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setHostingAuth(true);
@@ -180,7 +346,10 @@ export default function App() {
         setDeployments([]);
       }
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
   }, []);
 
   useEffect(() => {
@@ -201,6 +370,25 @@ export default function App() {
       setAuthKey('');
     } else {
       alert('Invalid access key');
+    }
+  };
+
+  const fetchPreciseLocation = () => {
+    setAdvancedDeviceInfo(prev => ({ ...prev, preciseLocation: 'Requesting...' }));
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setAdvancedDeviceInfo(prev => ({ 
+            ...prev, 
+            preciseLocation: `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)} (Acc: ${Math.round(position.coords.accuracy)}m)` 
+          }));
+        },
+        (error) => {
+          setAdvancedDeviceInfo(prev => ({ ...prev, preciseLocation: `Denied/Error: ${error.message}` }));
+        }
+      );
+    } else {
+      setAdvancedDeviceInfo(prev => ({ ...prev, preciseLocation: 'Not supported' }));
     }
   };
 
@@ -279,6 +467,24 @@ export default function App() {
     { name: "Amelia Jackson", company: "Jackson Tech", quote: "A lifesaver when we were dealing with a complex DDoS attack." },
     { name: "Benjamin White", company: "White Cyber", quote: "Consistently delivers high-quality security assessments." }
   ];
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) {
+      setResetMessage('Please enter your email address.');
+      return;
+    }
+    setIsResetting(true);
+    setResetMessage('');
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      setResetMessage('Password reset email sent! Check your inbox.');
+    } catch (error: any) {
+      setResetMessage(error.message || 'Failed to send reset email.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const handleAdminAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -445,6 +651,15 @@ export default function App() {
                     placeholder="Enter password..."
                     required
                   />
+                  <div className="flex justify-end mt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => { setResetEmail(hostingEmail); setShowResetModal(true); }}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
                 </div>
                 <button type="submit" className="w-full bg-white text-black hover:bg-slate-200 font-bold py-3 rounded-lg transition-colors">
                   {isSignUp ? 'Sign Up' : 'Continue'}
@@ -809,6 +1024,15 @@ export default function App() {
                     placeholder="Enter password..."
                     required
                   />
+                  <div className="flex justify-end mt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => { setResetEmail(adminEmail); setShowResetModal(true); }}
+                      className="text-xs text-teal-400 hover:text-teal-300 transition-colors"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
                 </div>
                 <button type="submit" className="w-full bg-white text-black hover:bg-slate-200 font-bold py-3 rounded-lg transition-colors">
                   {isAdminSignUp ? 'Sign Up' : 'Log In'}
@@ -886,50 +1110,265 @@ export default function App() {
       </div>
 
       {/* Top Right Settings Button */}
-      <button 
+      <motion.button 
         onClick={() => setIsSettingsOpen(true)}
-        className="fixed top-6 right-6 z-50 w-12 h-12 bg-white/5 border border-white/10 hover:bg-white/10 rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-all backdrop-blur-sm"
+        className="fixed top-6 right-6 z-50 w-12 h-12 bg-white/5 border border-white/10 hover:bg-white/10 rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-all backdrop-blur-sm cursor-pointer"
+        animate={{ 
+          boxShadow: ['0px 0px 0px rgba(6,182,212,0)', '0px 0px 15px rgba(6,182,212,0.4)', '0px 0px 0px rgba(6,182,212,0)'],
+          scale: [1, 1.05, 1]
+        }}
+        transition={{ repeat: Infinity, duration: 2.5 }}
+        whileHover={{ scale: 1.15, rotate: 90 }}
+        whileTap={{ scale: 0.9 }}
       >
         <Settings className="w-5 h-5" />
-      </button>
+      </motion.button>
+
+      {/* Forgot Password Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl w-full max-w-md relative">
+            <button onClick={() => setShowResetModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-2xl font-bold text-white mb-2">Reset Password</h2>
+            <p className="text-slate-400 text-sm mb-6">Enter your email address and we'll send you a link to reset your password.</p>
+            
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-2">Email</label>
+                <input 
+                  type="email" 
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                  placeholder="Enter your email..."
+                  required
+                />
+              </div>
+              {resetMessage && (
+                <p className={`text-sm ${resetMessage.includes('sent') ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {resetMessage}
+                </p>
+              )}
+              <button 
+                type="submit" 
+                disabled={isResetting}
+                className="w-full bg-white text-black hover:bg-slate-200 font-bold py-3 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isResetting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Send Reset Link'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Settings Modal */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl w-full max-w-md relative">
+          <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl w-full max-w-5xl relative max-h-[90vh] overflow-y-auto">
             <button onClick={() => setIsSettingsOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-              <Settings className="w-6 h-6 text-cyan-400" /> Device Details
+              <Settings className="w-6 h-6 text-cyan-400" /> System Diagnostics & Device Tools
             </h2>
-            <div className="space-y-4">
-              <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
-                <Globe className="w-6 h-6 text-cyan-400" />
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Public IP</p>
-                  <p className="text-lg font-mono text-white">{networkInfo.ip}</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Network & Location */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white border-b border-white/10 pb-2">Network & Location</h3>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
+                  <Globe className="w-6 h-6 text-cyan-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Public IP</p>
+                    <p className="text-lg font-mono text-white truncate">{displayIp}</p>
+                  </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
+                  <Search className="w-6 h-6 text-indigo-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">IP Location</p>
+                    <p className="text-lg font-medium text-white truncate">{displayLocation}</p>
+                  </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
+                  <MapPin className="w-6 h-6 text-red-400 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">GPS Coordinates</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-mono text-white truncate">{advancedDeviceInfo.preciseLocation}</p>
+                      <button 
+                        onClick={fetchPreciseLocation}
+                        className="text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 px-2 py-1 rounded transition-colors shrink-0"
+                      >
+                        Fetch GPS
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
+                  <Wifi className="w-6 h-6 text-blue-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Connection Type</p>
+                    <p className="text-lg font-medium text-white truncate">{networkInfo.type}</p>
+                  </div>
                 </div>
               </div>
-              <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
-                <Search className="w-6 h-6 text-indigo-400" />
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Location</p>
-                  <p className="text-lg font-medium text-white">{networkInfo.location}</p>
+
+              {/* Hardware & System */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white border-b border-white/10 pb-2">Hardware & System</h3>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
+                  <Monitor className="w-6 h-6 text-emerald-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Device & Screen</p>
+                    <p className="text-sm font-medium text-white truncate">{networkInfo.device} | {advancedDeviceInfo.screen}</p>
+                  </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
+                  <Cpu className="w-6 h-6 text-orange-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Processor & Memory</p>
+                    <p className="text-sm font-medium text-white truncate">{advancedDeviceInfo.cores} | {advancedDeviceInfo.memory}</p>
+                  </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
+                  <Crosshair className="w-6 h-6 text-purple-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Graphics (WebGL)</p>
+                    <p className="text-xs font-mono text-white truncate" title={advancedDeviceInfo.gpu}>{advancedDeviceInfo.gpu}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-3">
+                    <Battery className="w-5 h-5 text-green-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wider">Battery</p>
+                      <p className="text-sm font-medium text-white truncate">{advancedDeviceInfo.battery}</p>
+                    </div>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-yellow-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wider">Timezone</p>
+                      <p className="text-sm font-medium text-white truncate" title={advancedDeviceInfo.timezone}>{advancedDeviceInfo.timezone}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Sensors & Media (Phone Connection) */}
+                <h3 className="text-lg font-semibold text-white border-b border-white/10 pb-2 mt-6 flex items-center gap-2">
+                  <Smartphone className="w-5 h-5 text-pink-400" /> Device Sensors & Media
+                </h3>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Camera className={`w-5 h-5 ${cameraActive ? 'text-emerald-400' : 'text-slate-500'}`} />
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider">Camera Access</p>
+                        <p className={`text-sm font-medium ${cameraActive ? 'text-emerald-400' : 'text-slate-400'}`}>
+                          {cameraActive ? 'Connected (Live)' : 'Disconnected / Denied'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <MessageSquare className={`w-5 h-5 ${smsStatus.includes('Blocked') || smsStatus.includes('Denied') ? 'text-red-400' : 'text-emerald-400'}`} />
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider">SMS Intercept</p>
+                        <p className={`text-sm font-medium ${smsStatus.includes('Blocked') || smsStatus.includes('Denied') ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {smsStatus}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
-                <Monitor className="w-6 h-6 text-emerald-400" />
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Current Device</p>
-                  <p className="text-lg font-medium text-white">{networkInfo.device}</p>
-                </div>
-              </div>
-              <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
-                <Wifi className="w-6 h-6 text-blue-400" />
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Connection Type</p>
-                  <p className="text-lg font-medium text-white">{networkInfo.type}</p>
+
+              {/* Secure VPN Routing */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white border-b border-white/10 pb-2 flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-teal-400" /> Secure VPN Routing
+                </h3>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase tracking-wider">Status</p>
+                      <p className={`text-sm font-bold ${vpnStatus === 'connected' ? 'text-emerald-400' : vpnStatus === 'connecting' ? 'text-yellow-400' : 'text-slate-400'}`}>
+                        {vpnStatus === 'connected' ? 'SECURE CONNECTION' : vpnStatus === 'connecting' ? 'ESTABLISHING...' : 'DISCONNECTED'}
+                      </p>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={toggleVpn}
+                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                        vpnStatus === 'connected' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' :
+                        vpnStatus === 'connecting' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50' :
+                        'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <Power className="w-5 h-5" />
+                    </motion.button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Select Server Location</p>
+                    <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                      {vpnServers.map(server => (
+                        <button
+                          key={server.id}
+                          onClick={() => {
+                            if (vpnStatus !== 'connecting') {
+                              setSelectedVpnServer(server);
+                              if (vpnStatus === 'connected') {
+                                setVpnStatus('connecting');
+                                setTimeout(() => setVpnStatus('connected'), 1500);
+                              }
+                            }
+                          }}
+                          disabled={vpnStatus === 'connecting'}
+                          className={`flex items-center justify-between p-3 rounded-lg border text-left transition-all ${
+                            selectedVpnServer.id === server.id 
+                              ? 'bg-teal-500/20 border-teal-500/50 text-white' 
+                              : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                          } ${vpnStatus === 'connecting' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl">{server.flag}</span>
+                            <span className="text-sm font-medium truncate">{server.name}</span>
+                          </div>
+                          {selectedVpnServer.id === server.id && vpnStatus === 'connected' && (
+                            <Signal className="w-4 h-4 text-emerald-400" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {vpnStatus === 'connected' && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="pt-3 border-t border-white/10 flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase">Ping</p>
+                        <p className="text-xs font-mono text-emerald-400">{selectedVpnServer.ping}</p>
+                      </div>
+                      <div className="flex-1 ml-4">
+                        <p className="text-[10px] text-slate-400 uppercase text-right">Signal Strength</p>
+                        <div className="flex items-center justify-end gap-2 mt-1">
+                          <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${selectedVpnServer.signal}%` }}></div>
+                          </div>
+                          <span className="text-xs font-mono text-emerald-400 w-8 text-right">{selectedVpnServer.signal}%</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1123,7 +1562,7 @@ export default function App() {
               <X className="w-5 h-5" />
             </button>
             
-            {resources.filter(r => r.id === activeResource).map(resource => (
+            {[...resources, ...hackingTools].filter(r => r.id === activeResource).map(resource => (
               <div key={resource.id}>
                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
                   {resource.icon} {resource.title}
@@ -1201,7 +1640,7 @@ export default function App() {
                 <Globe className="w-6 h-6 text-cyan-400" />
                 <div>
                   <p className="text-xs text-slate-400 uppercase tracking-wider">Public IP</p>
-                  <p className="text-lg font-mono text-white">{networkInfo.ip}</p>
+                  <p className="text-lg font-mono text-white">{displayIp}</p>
                 </div>
               </div>
               <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4">
@@ -1266,12 +1705,22 @@ export default function App() {
             </p>
             
             <div className="flex flex-wrap gap-4">
-              <a href="#contact" className="px-8 py-4 bg-white text-black hover:bg-slate-200 transition-all rounded-full font-medium flex items-center gap-2">
+              <motion.a 
+                whileHover={{ scale: 1.05, rotateX: 5, rotateY: 5 }}
+                whileTap={{ scale: 0.95 }}
+                href="#contact" 
+                className="px-8 py-4 bg-white text-black hover:bg-slate-200 transition-all rounded-full font-medium flex items-center gap-2"
+              >
                 Establish Connection <ChevronRight className="w-4 h-4" />
-              </a>
-              <a href="#projects" className="px-8 py-4 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all rounded-full font-medium">
+              </motion.a>
+              <motion.a 
+                whileHover={{ scale: 1.05, rotateX: -5, rotateY: -5 }}
+                whileTap={{ scale: 0.95 }}
+                href="#projects" 
+                className="px-8 py-4 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all rounded-full font-medium"
+              >
                 View Operations
-              </a>
+              </motion.a>
             </div>
           </motion.div>
         </header>
@@ -1378,6 +1827,40 @@ export default function App() {
                     <h3 className="text-xl font-bold text-white mb-3">{resource.title}</h3>
                     <p className="text-slate-400 text-sm leading-relaxed">
                       {resource.description}
+                    </p>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          </section>
+
+          {/* Hacking Tools Section */}
+          <section className="mb-32">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <h2 className="text-3xl font-bold tracking-tight text-white mb-12 flex items-center gap-4">
+                <ShieldCheck className="w-8 h-8 text-red-500" />
+                Hacking Tools (Ethical Bypass & Exploit)
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {hackingTools.map((tool, index) => (
+                  <motion.div
+                    key={index}
+                    whileHover={{ y: -5 }}
+                    onClick={() => setActiveResource(tool.id)}
+                    className="bg-white/5 border border-white/10 p-8 rounded-2xl hover:bg-white/10 transition-all cursor-pointer group"
+                  >
+                    <div className="bg-black/30 w-14 h-14 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                      {tool.icon}
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-3">{tool.title}</h3>
+                    <p className="text-slate-400 text-sm leading-relaxed">
+                      {tool.description}
                     </p>
                   </motion.div>
                 ))}
