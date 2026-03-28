@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "Deployment": {
+      "title": "Deployment",
+      "description": "A project deployed by a user",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who deployed the project"
+        },
+        "projectName": {
+          "type": "string",
+          "description": "The name of the project"
+        },
+        "domain": {
+          "type": "string",
+          "description": "The domain extension"
+        },
+        "url": {
+          "type": "string",
+          "description": "The full URL of the deployment"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "When the project was deployed"
+        }
+      },
+      "required": ["userId", "projectName", "domain", "url", "createdAt"]
+    }
+  },
+  "firestore": {
+    "deployments/{deploymentId}": {
+      "schema": { "$ref": "#/entities/Deployment" },
+      "description": "Stores user deployments"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    function uidUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidDeployment(data) {
+      return hasOnlyAllowedFields(['userId', 'projectName', 'domain', 'url', 'createdAt']) &&
+             data.userId is string && data.userId.size() > 0 &&
+             data.projectName is string && data.projectName.size() > 0 && data.projectName.size() < 100 &&
+             data.domain is string && data.domain.size() > 0 && data.domain.size() < 20 &&
+             isValidUrl(data.url) &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Collections
+    // ===============================================================
+    match /deployments/{deploymentId} {
+      // Admin can read all, owner can read their own
+      allow read: if isDocOwner() || (isAuthenticated() && request.auth.token.email == "blessedsuccess738@gmail.com");
+      allow create: if isAuthenticated() && 
+                    uidUnchanged() && 
+                    request.resource.data.userId == request.auth.uid &&
+                    isValidDeployment(request.resource.data);
+      allow update: if isDocOwner() && 
+                    uidNotModified() && 
+                    isValidDeployment(request.resource.data) &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isDocOwner() || (isAuthenticated() && request.auth.token.email == "blessedsuccess738@gmail.com");
+    }
+  }
+}
